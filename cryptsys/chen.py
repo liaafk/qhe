@@ -1,6 +1,9 @@
 from qrisp import QuantumArray, QuantumFloat, QuantumModulus, dot, q_divmod
 import numpy as np
 import math
+import os
+import time
+import re
 
 def hamming_code_gen(N, k):
     n = 2**k-k-1
@@ -84,16 +87,21 @@ def decrypt(cres, bin_carry, r, s_inv, p_inv):
     bin_carry = bin_carry + '0'
     return int(decres_bin,2) + int(bin_carry,2)
 
-def he_add(x1,x2, psi, r, s_inv, p_inv):
+def read_array(file):
+    pattern = r"\((.*?)\)"
+    with open(file, 'r') as file:
+        content = ''.join(file.read().split())
+        match = re.findall(pattern, content)[0]
+    try:
+        np_array = np.array(eval(match))
+    except Exception as e:
+        print(f"Error converting text to numpy array: {e}")
+    cres = QuantumArray(qtype=QuantumModulus(2), shape= (1,7))
+    cres[:] = np.reshape(np_array, (1,7))
+    return cres
+
+def he_add(x1,x2, psi, r, s_inv, p_inv, cx_file='cx_data.txt', result_file='result_data.txt', cx_ready_file='cx_ready.txt', result_ready_file='result_ready.txt'):
     result = 0
-    #currently inputs are 'normal' integers and output is the decrypted result of the
-    #HE addition done with qrisp. Depending on later requirements we could
-    #change e.g. the inputs to QuantumFloats, the output to the encrypted result, ... 
-        
-    #not ideal: user has to specify how many data bits the inputs and result
-    #should take each as binary (e.g. 4+4 = 8 -> 0100 + 0100 = 1000, so n = 4)
-    #'valid' n based on Hamming code, see https://de.wikipedia.org/wiki/Hamming-Code
-    
     if x1 >= 2**4 or x2 >= 2**4:
         x11 = max(0, x1-2**4+1)
         x12 = x1-x11
@@ -108,7 +116,24 @@ def he_add(x1,x2, psi, r, s_inv, p_inv):
         arr_bin_x1 = [int(x) for x in bin_x1]
         arr_bin_x2 = [int(x) for x in bin_x2]
         cx1, cx2 = encrypt(arr_bin_x1, arr_bin_x2, psi)
-        cres = cx1 + cx2
+        #cres = cx1 + cx2
+        with open(cx_file, 'a') as f:
+            print(cx1, file=f)
+            print(cx2, file=f)
+
+        # Create a flag to notify the external program
+        with open(cx_ready_file, 'w') as f:
+            f.write('ready')
+    
+        # Wait for the result ready flag
+        while not os.path.exists(result_ready_file):
+            time.sleep(1)  # Check every second
+
+        # Retrieve the addition result from the result file
+        cres = read_array(result_file)
         result = result + decrypt(cres, bin_carry, r, s_inv, p_inv)
+
+        os.remove(result_file)
+        os.remove(result_ready_file)
     
     return result

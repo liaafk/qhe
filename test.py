@@ -9,7 +9,7 @@ def chen_add(num1, num2):
     return chen.he_add(num1,num2, psi, r, s_inv, p_inv)
     
 def gsw_add(num1, num2):
-    keys = gsw.keygen(4)
+    keys = gsw.keygen(2)
     ca = gsw.encrypt(keys, num1)
     cb = gsw.encrypt(keys, num2)
     ca_cb = ca.most_likely() + cb.most_likely()
@@ -78,7 +78,7 @@ def generate_input_pairs(num_iterations):
 
 def main():
     # Define a range of input sizes to test
-    nums1, nums2 = generate_input_pairs(4)
+    nums1, nums2 = generate_input_pairs(1)
 
     # Initialize lists to store runtimes for each algorithm
     chen_times = []
@@ -87,11 +87,11 @@ def main():
     paillier_times = []
 
   # Measure and store runtimes for each input size
-    for i in range(len(nums1)):
-        chen_times.append(run_and_time('chen', nums1[i], nums2[i], i))
-        gsw_times.append(run_and_time('gsw', nums1[i], nums2[i], i))
-        qotp_times.append(run_and_time('qotp', nums1[i], nums2[i], i))
-        paillier_times.append(run_and_time('paillier', nums1[i], nums2[i], i))
+    for i in range(1, len(nums1)+1):
+        chen_times.append(run_and_time('chen', nums1[i-1], nums2[i-1], i))
+        gsw_times.append(run_and_time('gsw', nums1[i-1], nums2[i-1], i))
+        qotp_times.append(run_and_time('qotp', nums1[i-1], nums2[i-1], i))
+        paillier_times.append(run_and_time('paillier', nums1[i-1], nums2[i-1], i))
 
     # Create the plot
     plt.figure(figsize=(10, 6))

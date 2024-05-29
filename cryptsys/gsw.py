@@ -2,6 +2,9 @@ from sympy import isprime
 from math import floor, ceil, log2
 from random import randint
 import numpy as np
+import time
+import re
+import os
 from scipy.linalg import block_diag
 from scipy.stats import mode
 from qrisp import QuantumFloat, QuantumArray, semi_classic_matmul
@@ -80,37 +83,47 @@ def keygen(k):
     return GSWKeys(k, q, t_q, A, B_q, datatype)
 
 def buildGadget(l, n):
-    # the secret vector [s] is an (n-1)-dimensional vector,
-    # the secret key [t] is -s 1, an n-dimensional vector‖
-    #
-    # the error vector [e] is an m-dimensional vector
-    #
-    # the matrix [A] is an (n-1)×m matrix (n-1 rows, m = n×l columns)
-    #
-    # the public key [B] is ( A ) which is an n×m matrix
-    # ( sA+e )
-    #
+    
     g = 2**np.arange(l)
     G = block_diag(*[g for null in range(n)])
     return G
 
 def encrypt(keys, message):
-    #
-    # the gadget matrix [G] is an n×m matrix (n rows, m = n×l columns)
-    #
-    # the matrix R is an m×m matrix (n×l rows, n×l columns)
-    #
-    # the ciphertext is (n×m) (m×m) *> an n×m matrix⋅
-    #
+    
     R = np.random.randint(2, size=(keys.m, keys.m), dtype=np.int64).astype(keys.datatype)
     #R_q = QuantumArray(qtype = QuantumModulus(keys.q), shape=(keys.m, keys.m))
     #R_q.encode(R)
     G = buildGadget(keys.l, keys.n)
     return semi_classic_matmul(keys.PK, R) + message*G
 
-def decrypt(keys, ciphertext):
+def write_file(cx1,cx2, cx_file='cx_data.txt',  cx_ready_file='cx_ready.txt'):
+    with open(cx_file, 'a') as f:
+        print(cx1, file=f)
+        print(cx2, file=f)
+    # Create a flag to notify the external program
+    with open(cx_ready_file, 'w') as f:
+        f.write('ready')
+
+def read_array(file):
+    with open(file, 'r') as file:
+        content = ''.join(file.read().split())
+
+    try:
+        np_array = np.array(eval(content))
+        return np_array
+    except Exception as e:
+        print(f"Error converting text to numpy array: {e}")
+
+def decrypt(keys, result_file='result_data.txt', result_ready_file='result_ready.txt'):
+
+    # Wait for the result ready flag
+    while not os.path.exists(result_ready_file):
+        time.sleep(1)  # Check every second
+
+    # Retrieve the addition result from the result file
+    cres = read_array(result_file)
     sk = keys.SK.most_likely()
-    msg = np.dot(sk, ciphertext) #% keys.q
+    msg = np.dot(sk, cres) #% keys.q
     g = buildGadget(keys.l, keys.n)
     sg = np.dot(sk, g) #% keys.q
     div = np.rint((msg / sg).astype(float)).astype(np.int64)
@@ -126,4 +139,7 @@ def decrypt(keys, ciphertext):
         if dist < best_dist:
             best_num = mu
             best_dist = dist
+    
+    os.remove(result_file)
+    os.remove(result_ready_file)
     return best_num
