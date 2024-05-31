@@ -1,9 +1,12 @@
 from qrisp import QuantumArray, QuantumFloat, QuantumModulus, dot, q_divmod
 import numpy as np
 import math
-import os
-import time
+import json
 import re
+import requests
+
+url = "http://localhost:5000/process"
+headers = {'Content-Type': 'application/json'}
 
 def hamming_code_gen(N, k):
     n = 2**k-k-1
@@ -87,20 +90,16 @@ def decrypt(cres, bin_carry, r, s_inv, p_inv):
     bin_carry = bin_carry + '0'
     return int(decres_bin,2) + int(bin_carry,2)
 
-def read_array(file):
-    pattern = r"\((.*?)\)"
-    with open(file, 'r') as file:
-        content = ''.join(file.read().split())
-        match = re.findall(pattern, content)[0]
+def read_array(data):
     try:
-        np_array = np.array(eval(match))
+        np_array = np.array(eval(data))
     except Exception as e:
         print(f"Error converting text to numpy array: {e}")
     cres = QuantumArray(qtype=QuantumModulus(2), shape= (1,7))
     cres[:] = np.reshape(np_array, (1,7))
     return cres
 
-def he_add(x1,x2, psi, r, s_inv, p_inv, cx_file='cx_data.txt', result_file='result_data.txt', cx_ready_file='cx_ready.txt', result_ready_file='result_ready.txt'):
+def he_add(x1,x2, psi, r, s_inv, p_inv):
     result = 0
     if x1 >= 2**4 or x2 >= 2**4:
         x11 = max(0, x1-2**4+1)
@@ -116,24 +115,12 @@ def he_add(x1,x2, psi, r, s_inv, p_inv, cx_file='cx_data.txt', result_file='resu
         arr_bin_x1 = [int(x) for x in bin_x1]
         arr_bin_x2 = [int(x) for x in bin_x2]
         cx1, cx2 = encrypt(arr_bin_x1, arr_bin_x2, psi)
-        #cres = cx1 + cx2
-        with open(cx_file, 'a') as f:
-            print(cx1, file=f)
-            print(cx2, file=f)
-
-        # Create a flag to notify the external program
-        with open(cx_ready_file, 'w') as f:
-            f.write('ready')
-    
-        # Wait for the result ready flag
-        while not os.path.exists(result_ready_file):
-            time.sleep(1)  # Check every second
-
-        # Retrieve the addition result from the result file
-        cres = read_array(result_file)
-        result = result + decrypt(cres, bin_carry, r, s_inv, p_inv)
-
-        os.remove(result_file)
-        os.remove(result_ready_file)
-    
+        input1 = f"{cx1.most_likely()}"
+        input2 = f"{cx2.most_likely()}"
+        input_data = f"{'('+','.join(input1.split())+')'}\n{'('+','.join(input2.split())+')'}"
+        response = requests.post(url, data=json.dumps(input_data), headers=headers)
+        if response.status_code == 200:
+            res = response.json()['result']
+            cres = read_array(res)
+            result = result + decrypt(cres, bin_carry, r, s_inv, p_inv)
     return result

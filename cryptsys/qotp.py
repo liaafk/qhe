@@ -1,8 +1,5 @@
-from qrisp import QuantumFloat, QuantumSession, x, z, cx, mcx
+from qrisp import QuantumFloat, x, z, mcx
 import numpy as np
-import math
-import os
-import time
 import re
 
 def bit_carry(j,k,carry):
@@ -10,7 +7,7 @@ def bit_carry(j,k,carry):
         mcx([j.reg[i], k.reg[i]], carry.reg[i])
     carry.exp_shift(1)
 
-def encrypt(j, k, cx_file='cx_data.txt', cx_ready_file='cx_ready.txt'):
+def encrypt(j, k):
     a_list = []
     b_list = []
     c_list = []
@@ -30,44 +27,24 @@ def encrypt(j, k, cx_file='cx_data.txt', cx_ready_file='cx_ready.txt'):
         if(d == 1):
             z(q2)
     
-    with open(cx_file, 'a') as f:
-        print(j, file=f)
-        print(k, file=f)
-        
-    # Create a flag to notify the external program
-    with open(cx_ready_file, 'w') as f:
-        f.write('ready')
     return a_list, c_list, d_list
 
 def add(j,k):
     return 
 
-def read_result(file):
-    with open(file, 'r') as file:
-        pattern = r"\{([^:]+):"
-        for line in file:
-            pass
-        match = int(re.findall(pattern, line)[0])
+def read_result(response):
+    match = int(float((response.json()['result'].split('\n'))[-1]))
     cres = QuantumFloat(match.bit_length())
     cres[:] = match
-
     return cres
 
-def decrypt(carry, a_list, c_list, d_list, result_file='result_data.txt', result_ready_file='result_ready.txt'):
-    # Wait for the result ready flag
-    while not os.path.exists(result_ready_file):
-        time.sleep(1)  # Check every second
-
+def decrypt(carry, response, a_list, c_list, d_list):
     # Retrieve the addition result from the result file
-    res = read_result(result_file)
+    res = read_result(response)
     for i in range(len(res.reg)):
         if a_list[i] != c_list[i]:
             x(res.reg[i])
         if d_list[i] == 1:
             z(res.reg[i])
-    print(res)
-    print(carry)
-    os.remove(result_file)
-    os.remove(result_ready_file)
 
     return carry + res

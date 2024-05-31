@@ -1,5 +1,10 @@
 from cryptsys import chen, gsw, paillier, qotp
-from qrisp import QuantumFloat, QuantumModulus
+from qrisp import QuantumFloat
+import requests
+import json
+
+url = "http://localhost:5000/process"
+headers = {'Content-Type': 'application/json'}
 
 def main():
   
@@ -22,7 +27,10 @@ def main():
         carry[:] = 0
         qotp.bit_carry(qnum1, qnum2, carry)
         a_list, c_list, d_list = qotp.encrypt(qnum1, qnum2)
-        result = qotp.decrypt(carry, a_list, c_list, d_list)
+        input_data = f"{qnum1.get_ev()}\n{qnum2.get_ev()}"
+        response = requests.post(url, data=json.dumps(input_data), headers=headers)
+        if response.status_code == 200:
+            result = qotp.decrypt(carry, response, a_list, c_list, d_list)
 
     if cs == "paillier":
         (n, g), (lamb, mu) = paillier.keygen()
@@ -31,14 +39,19 @@ def main():
         qnum2 = QuantumFloat(num2.bit_length())
         qnum2[:] = num2
         c1, c2 = paillier.encrypt(qnum1, qnum2, n, g)
-        result = paillier.decrypt(n, lamb, mu)
+        input_data = f"{c1}\n{c2}"
+        response = requests.post(url, data=json.dumps(input_data), headers=headers)
+        if response.status_code == 200:
+            result = paillier.decrypt(n, response, lamb, mu)
     
     if cs == "gsw":
         keys = gsw.keygen(3)
         cx1 = gsw.encrypt(keys,num1)
         cx2 = gsw.encrypt(keys,num2)
-        gsw.write_file(cx1, cx2)
-        result = gsw.decrypt(keys)
+        input_data = f"{cx1}\n{cx2}"
+        response = requests.post(url, data=json.dumps(input_data), headers=headers)
+        if response.status_code == 200:
+            result = gsw.decrypt(keys, response)
     
     print(f"Sum of encrypted numbers: {result}")
 

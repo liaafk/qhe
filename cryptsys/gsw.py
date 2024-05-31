@@ -96,32 +96,17 @@ def encrypt(keys, message):
     G = buildGadget(keys.l, keys.n)
     return semi_classic_matmul(keys.PK, R) + message*G
 
-def write_file(cx1,cx2, cx_file='cx_data.txt',  cx_ready_file='cx_ready.txt'):
-    with open(cx_file, 'a') as f:
-        print(cx1, file=f)
-        print(cx2, file=f)
-    # Create a flag to notify the external program
-    with open(cx_ready_file, 'w') as f:
-        f.write('ready')
-
-def read_array(file):
-    with open(file, 'r') as file:
-        content = ''.join(file.read().split())
-
+def read_array(response):
     try:
-        np_array = np.array(eval(content))
+        np_array = np.array(eval(response.json()['result']))
         return np_array
     except Exception as e:
         print(f"Error converting text to numpy array: {e}")
 
-def decrypt(keys, result_file='result_data.txt', result_ready_file='result_ready.txt'):
-
-    # Wait for the result ready flag
-    while not os.path.exists(result_ready_file):
-        time.sleep(1)  # Check every second
+def decrypt(keys, response):
 
     # Retrieve the addition result from the result file
-    cres = read_array(result_file)
+    cres = read_array(response)
     sk = keys.SK.most_likely()
     msg = np.dot(sk, cres) #% keys.q
     g = buildGadget(keys.l, keys.n)
@@ -140,6 +125,4 @@ def decrypt(keys, result_file='result_data.txt', result_ready_file='result_ready
             best_num = mu
             best_dist = dist
     
-    os.remove(result_file)
-    os.remove(result_ready_file)
     return best_num
