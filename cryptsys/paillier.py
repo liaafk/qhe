@@ -1,6 +1,11 @@
 import random
 from Crypto.Util.number import GCD, getPrime, inverse
 from qrisp import QuantumFloat
+import requests
+import json
+
+url = "http://localhost:5000/process"
+headers = {'Content-Type': 'application/json'}
 
 def keygen():
     p = getPrime(8)
@@ -35,6 +40,17 @@ def encrypt(m1, m2, n, g, cx_file='cx_data.txt', cx_ready_file='cx_ready.txt'):
     c2 = (q_pow(g, m2, n**2) * pow(r, n, n**2)) % (n**2)
 
     return c1, c2
+
+def he_add(num1, num2, n, g, lamb, mu):
+    qnum1 = QuantumFloat(num1.bit_length())
+    qnum1[:] = num1
+    qnum2 = QuantumFloat(num2.bit_length())
+    qnum2[:] = num2
+    c1, c2 = encrypt(qnum1, qnum2, n, g)
+    input_data = f"{c1}\n{c2}"
+    response = requests.post(url, data=json.dumps(input_data), headers=headers)
+    if response.status_code == 200:
+        return decrypt(n, response, lamb, mu)
 
 def decrypt(n, response, lamb, mu):
     res = int((response.json()['result'].split('\n'))[0])

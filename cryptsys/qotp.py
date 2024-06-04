@@ -1,6 +1,11 @@
 from qrisp import QuantumFloat, x, z, mcx
 import numpy as np
 import re
+import requests
+import json
+
+url = "http://localhost:5000/process"
+headers = {'Content-Type': 'application/json'}
 
 def bit_carry(j,k,carry):
     for i in range(len(carry.reg)):
@@ -29,8 +34,21 @@ def encrypt(j, k):
     
     return a_list, c_list, d_list
 
-def add(j,k):
-    return 
+def he_add(num1,num2):
+    bits = max(num1.bit_length(), num2.bit_length())
+    qnum1 = QuantumFloat(bits)
+    qnum1[:] = num1
+    qnum2 = QuantumFloat(bits)
+    qnum2[:] = num2
+    carry = QuantumFloat(bits)
+    carry[:] = 0
+    bit_carry(qnum1, qnum2, carry)
+    a_list, c_list, d_list = encrypt(qnum1, qnum2)
+    input_data = f"{qnum1.get_ev()}\n{qnum2.get_ev()}"
+    response = requests.post(url, data=json.dumps(input_data), headers=headers)
+    if response.status_code == 200:
+        return decrypt(carry, response, a_list, c_list, d_list)
+
 
 def read_result(response):
     match = int(float((response.json()['result'].split('\n'))[-1]))

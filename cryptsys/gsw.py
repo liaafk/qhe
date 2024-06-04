@@ -2,12 +2,14 @@ from sympy import isprime
 from math import floor, ceil, log2
 from random import randint
 import numpy as np
-import time
-import re
-import os
 from scipy.linalg import block_diag
 from scipy.stats import mode
 from qrisp import QuantumFloat, QuantumArray, semi_classic_matmul
+import requests
+import json
+
+url = "http://localhost:5000/process"
+headers = {'Content-Type': 'application/json'}
 
 class GSWKeys:
     def __init__(self, k, q, t, A, B, datatype):
@@ -55,7 +57,6 @@ def keygen(k):
     # and get its bit length [l]
     q = generateSophieGermainPrime(k)
     l = ceil(log2(q))
-    print(" "*12 + "q = %d" % q)
     #
     # the gadget matrix [G] is an n×m matrix (n rows, m = n×l columns)
     #
@@ -126,3 +127,11 @@ def decrypt(keys, response):
             best_dist = dist
     
     return best_num
+
+def he_add(num1, num2, keys):
+    cx1 = encrypt(keys,num1)
+    cx2 = encrypt(keys,num2)
+    input_data = f"{cx1}\n{cx2}"
+    response = requests.post(url, data=json.dumps(input_data), headers=headers)
+    if response.status_code == 200:
+        return decrypt(keys, response)
