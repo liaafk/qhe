@@ -63,3 +63,46 @@ def decrypt(carry, response, a_list, c_list, d_list):
             z(res.reg[i])
 
     return carry + res
+
+# Function to guess the encryption pattern
+def guess_secret_key(ciphertexts, plaintexts):
+    for attempt in range(100):  # Number of attempts to guess the pattern
+        correct_guesses = 0
+        a_list, c_list, d_list = []
+        for pt, ct in zip(plaintexts, ciphertexts):
+            # Create quantum state for the guessed plaintext
+            guessed_qnum1 = QuantumFloat(len(pt.reg))
+            guessed_qnum1[:] = pt
+            guessed_qnum2 = QuantumFloat(len(pt.reg))
+            guessed_qnum2[:] = 0  # Assuming zero for simplicity
+            bit_carry(guessed_qnum1, guessed_qnum2, QuantumFloat(len(pt.reg)))
+            guessed_a_list, guessed_c_list, guessed_d_list = encrypt(guessed_qnum1, guessed_qnum2)
+            if guessed_qnum1.most_likely() == ct:
+                correct_guesses += 1
+                a_list, c_list, d_list = guessed_a_list, guessed_c_list, guessed_d_list
+
+        if correct_guesses == len(plaintexts):
+            return a_list, c_list, d_list
+
+# Function to perform chosen plaintext attack and predict plaintext from ciphertext
+def chosen_plaintext_attack_and_predict(test_ciphertext):
+    plaintexts = np.random.randint(100, size=10)
+    ciphertexts = []
+
+    for pt in plaintexts:
+        bits = max(pt.bit_length(), 1)  # Ensure at least 1 bit
+        qnum1 = QuantumFloat(bits)
+        qnum1[:] = pt
+        qnum2 = QuantumFloat(bits)
+        qnum2[:] = 0  # Encrypting with zero for simplicity
+        a_list_enc, c_list_enc, d_list_enc = encrypt(qnum1, qnum2)
+        ciphertexts.append(qnum1)
+
+    # Attempt to guess the encryption pattern
+    a_list, c_list, d_list = guess_secret_key(ciphertexts, plaintexts)
+
+    carry = QuantumFloat(1)
+    carry[:] = 0
+    # Use the guessed encryption pattern to decrypt the test ciphertext
+    decrypted = decrypt(carry, test_ciphertext, a_list, c_list, d_list)
+    return decrypted.most_likely()

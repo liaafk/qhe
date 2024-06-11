@@ -121,3 +121,84 @@ def he_add(x1,x2, psi, r, s_inv, p_inv):
             cres = read_array(res)
             result = result + decrypt(cres, bin_carry, r, s_inv, p_inv)
     return result
+
+# Function to guess the secret key
+def guess_secret_key(ciphertexts, plaintexts, n):
+    k = math.floor(math.log2(n)) + 1
+    N = n + k
+
+    for attempt in range(10):  # Number of attempts to guess the key
+        print(attempt)
+        s_prime, g_prime, p_prime, r_prime = hamming_code_gen(N, k)
+        s = QuantumArray(qtype=QuantumModulus(2), shape=(n, n))
+        s.encode(np.reshape(s_prime, (n, n)))
+        s_inv = QuantumArray(qtype=QuantumModulus(2), shape=(n, n))
+        s_inv.encode(np.linalg.inv(np.reshape(s_prime, (n, n))) % 2)
+        g = QuantumArray(qtype=QuantumModulus(2), shape=(n, N))
+        g.encode(np.reshape(g_prime, (n, N)))
+        p = QuantumArray(qtype=QuantumModulus(2), shape=(N, N))
+        p.encode(np.reshape(p_prime, (N, N)))
+        p_inv = QuantumArray(qtype=QuantumModulus(2), shape=(N, N))
+        p_inv.encode(np.linalg.inv(np.reshape(p_prime, (N, N))))
+        r = QuantumArray(qtype=QuantumModulus(2), shape=(N, n))
+        r.encode(np.reshape(r_prime, (N, n)))
+        psi = s @ g @ p
+
+        correct_guesses = 0
+        for pt, cx1 in zip(plaintexts, ciphertexts):
+            decrypted = decrypt(cx1, '', r, s_inv, p_inv)
+            if decrypted == pt:
+                correct_guesses += 1
+
+        if correct_guesses == len(plaintexts):
+            return psi, r, s_inv, p_inv  # Return the guessed keys if all guesses are correct
+
+    return None
+
+# Function to perform chosen plaintext attack and predict plaintext from ciphertext
+def chosen_plaintext_attack_and_predict(test_ciphertext1):
+    n = 4
+    k = math.floor(math.log2(n)) + 1
+    N = n + k
+    plaintexts = np.arange(16)
+    ciphertexts = []
+
+    psi, r, s_inv, p_inv = keygen(n)
+    print('key generated in attack')
+
+    for pt in plaintexts:
+        bin_x1 = bin(pt)[2:].zfill(4)
+        bin_x2 = bin(0)[2:].zfill(4)  # Encrypting with zero for simplicity
+        arr_bin_x1 = [int(x) for x in bin_x1]
+        arr_bin_x2 = [int(x) for x in bin_x2]
+        cx1, cx2 = encrypt(arr_bin_x1, arr_bin_x2, psi)
+        ciphertexts.append(cx1)
+    print('plaintexts encrypted in attack')
+
+    # Attempt to guess the secret key
+    guessed_keys = guess_secret_key(ciphertexts, plaintexts, n)
+    if guessed_keys is None:
+        print("Failed to guess the secret key.")
+        return None
+
+    psi_guess, r_guess, s_inv_guess, p_inv_guess = guessed_keys
+    print('guessed keys')
+    # Use the guessed key to decrypt the test ciphertext
+    predicted_plaintext = decrypt(test_ciphertext1, '', r_guess, s_inv_guess, p_inv_guess)
+    return predicted_plaintext
+
+if __name__ == "__main__":
+    psi, r, s_inv, p_inv = keygen(4)
+    
+    # Encrypt a test plaintext
+    test_plaintext = 5
+    bin_x1 = bin(test_plaintext)[2:].zfill(4)
+    bin_x2 = bin(0)[2:].zfill(4)  # Encrypting with zero for simplicity
+    arr_bin_x1 = [int(x) for x in bin_x1]
+    arr_bin_x2 = [int(x) for x in bin_x2]
+    test_ciphertext1, test_ciphertext2 = encrypt(arr_bin_x1, arr_bin_x2, psi)
+    
+    # Perform the chosen plaintext attack and predict the plaintext
+    predicted_plaintext = chosen_plaintext_attack_and_predict(test_ciphertext1)
+    print(f"Original plaintext: {test_plaintext}")
+    print(f"Predicted plaintext: {predicted_plaintext}")

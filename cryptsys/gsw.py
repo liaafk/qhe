@@ -11,7 +11,7 @@ url = "http://localhost:5000/process"
 headers = {'Content-Type': 'application/json'}
 
 class GSWKeys:
-    def __init__(self, k, q, t, A, B, datatype):
+    def __init__(self, k, q, t, A, B):
         self.n = k
         self.q = q
         self.l = ceil(log2(q))
@@ -19,8 +19,7 @@ class GSWKeys:
         self.SK = t
         #self.e = e
         self.A = A
-        self.PK = B 
-        self.datatype = datatype
+        self.PK = B
 
 def gen_prime(b):
     p = randint(2**(b-1), 2**b)
@@ -54,7 +53,7 @@ def keygen(k):
 
 def encrypt(keys, message):
     
-    R = np.random.randint(2, size=(keys.m, keys.m), dtype=np.int64).astype(keys.datatype)
+    R = np.random.randint(2, size=(keys.m, keys.m), dtype=np.int64)
     g = 2**np.arange(keys.l)
     G = block_diag(*[g for null in range(keys.n)])
     return semi_classic_matmul(keys.PK, R) + message*G
@@ -97,3 +96,65 @@ def he_add(num1, num2, keys):
     response = requests.post(url, data=json.dumps(input_data), headers=headers)
     if response.status_code == 200:
         return decrypt(keys, response)
+    
+# Function to guess the secret key
+def guess_secret_key(ciphertexts, plaintexts, q, n):
+    l = ceil(log2(q))
+    m = n * l
+
+    for attempt in range(10):  # Number of attempts to guess the key
+        print(attempt)
+        s_guess = np.random.randint(q, size=n-1, dtype=np.int64)
+        t_guess = np.append(s_guess, 1)
+        #t_q_guess = QuantumArray(qtype=QuantumFloat(n+2), shape=(1, n))
+        #t_q_guess.encode(np.reshape(t_guess, (1, n)))
+
+        correct_guesses = 0
+        for pt, ct in zip(plaintexts, ciphertexts):
+            msg = np.dot(t_guess, ct)
+            g = 2**np.arange(l)
+            G = block_diag(*[g for _ in range(n)])
+            sg = np.dot(t_guess, G)
+            div = int(float(np.rint((msg / sg))))
+            if div == pt:
+                correct_guesses += 1
+
+        if correct_guesses == len(plaintexts):
+            return t_guess  # Return the guessed secret key if all guesses are correct
+
+    return None
+
+# Function to perform chosen plaintext attack and predict plaintext from ciphertext
+def chosen_plaintext_attack_and_predict(keys, test_ciphertext):
+    plaintexts = list(range(10))
+    ciphertexts = []
+
+    for pt in plaintexts:
+        ct = encrypt(keys, pt)
+        ciphertexts.append(ct)
+
+    # Attempt to guess the secret key
+    guessed_key = guess_secret_key(ciphertexts, plaintexts, keys.q, keys.n)
+    if guessed_key is None:
+        print("Failed to guess the secret key.")
+        return None
+
+    # Use the guessed key to decrypt the test ciphertext
+    sk = guessed_key.most_likely()
+    msg = np.dot(sk, test_ciphertext)
+    g = 2**np.arange(keys.l)
+    G = block_diag(*[g for _ in range(keys.n)])
+    sg = np.dot(sk, G)
+    div = int(float(np.rint((msg / sg))))
+    modes = np.unique(div, return_counts=True)
+    modes = sorted(zip(modes[0], modes[1]), key=lambda t: -t[1])
+    best_num = 0
+    best_dist = float('inf')
+    for mu in modes:
+        dist = np.minimum(msg - mu * sg, keys.q - (msg - mu * sg))
+        dist = np.dot(dist, dist.T)
+        if dist < best_dist:
+            best_num = mu
+            best_dist = dist
+
+    return best_num
