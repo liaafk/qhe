@@ -27,7 +27,7 @@ def q_pow(x, y, z):
         y = y - 1
     return exp%z
 
-def encrypt(m1, m2, n, g, cx_file='cx_data.txt', cx_ready_file='cx_ready.txt'):
+def encrypt(m1, m2, n, g):
     while True:
         r = random.randint(1, n - 1)
         if GCD(n, r) == 1:

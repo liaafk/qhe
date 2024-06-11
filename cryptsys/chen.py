@@ -1,8 +1,7 @@
-from qrisp import QuantumArray, QuantumFloat, QuantumModulus, dot, q_divmod
+from qrisp import QuantumArray, QuantumModulus, dot, q_divmod
 import numpy as np
 import math
 import json
-import re
 import requests
 
 url = "http://localhost:5000/process"
@@ -34,8 +33,6 @@ def hamming_code_gen(N, k):
     # create s; a scrambler matrix of 1s and 0s which is invertible
     s = np.round(np.random.rand(n, n))
     while ((np.linalg.det(s))**2 != 1):
-        #np.linalg.det(s) == 0
-           #(np.all([s[i][j].is_integer() for i in range(s.shape[0]) for j in range(s.shape[1])]))):
         s = np.round(np.random.rand(n, n))
     # create p; permutation matrix
     p = np.identity(N)

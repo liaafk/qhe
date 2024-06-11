@@ -1,6 +1,5 @@
 from qrisp import QuantumFloat, x, z, mcx
 import numpy as np
-import re
 import requests
 import json
 
@@ -14,7 +13,6 @@ def bit_carry(j,k,carry):
 
 def encrypt(j, k):
     a_list = []
-    b_list = []
     c_list = []
     d_list = []
 
@@ -57,7 +55,6 @@ def read_result(response):
     return cres
 
 def decrypt(carry, response, a_list, c_list, d_list):
-    # Retrieve the addition result from the result file
     res = read_result(response)
     for i in range(len(res.reg)):
         if a_list[i] != c_list[i]:
